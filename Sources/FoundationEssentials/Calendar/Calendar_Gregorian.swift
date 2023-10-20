@@ -268,6 +268,7 @@ internal final class _CalendarGregorian: _CalendarProtocol, @unchecked Sendable 
     }
     
     func minimumRange(of component: Calendar.Component) -> Range<Int>? {
+        // aka UCAL_GREATEST_MINIMUM..<UCAL_LEAST_MAXIMUM+1
         switch component {
         case .era: 0..<2
         case .year: 1..<140743
@@ -284,12 +285,14 @@ internal final class _CalendarGregorian: _CalendarProtocol, @unchecked Sendable 
         case .yearForWeekOfYear: 140742..<140743
         case .nanosecond: 0..<1000000000
         case .isLeapMonth: 0..<2
+        case .dayOfYear: 1..<366
         case .calendar, .timeZone:
             nil
         }
     }
     
     func maximumRange(of component: Calendar.Component) -> Range<Int>? {
+        // aka UCAL_MINIMUM..<UCAL_MAXIMUM+1
         switch component {
         case .era: 0..<2
         case .year: 1..<144684
@@ -306,6 +309,7 @@ internal final class _CalendarGregorian: _CalendarProtocol, @unchecked Sendable 
         case .yearForWeekOfYear: 140742..<144684
         case .nanosecond: 0..<1000000000
         case .isLeapMonth: 0..<2
+        case .dayOfYear: 1..<367
         case .calendar, .timeZone:
             nil
         }

@@ -275,6 +275,7 @@ final class CalendarTests : XCTestCase {
     }
     #endif // arch(x86_64) || arch(arm64)
 
+    @available(FoundationPreview 0.4, *)
     func test_dateSequence() {
         let cal = Calendar(identifier: .gregorian)
         // August 22, 2022 at 3:02:38 PM PDT
@@ -285,14 +286,14 @@ final class CalendarTests : XCTestCase {
             Date(timeIntervalSinceReferenceDate: 682898700.0),
         ]
 
-        let dates = cal.dates(startingAfter: date, matching: DateComponents(second: 0), matchingPolicy: .nextTime)
+        let dates = cal.dates(startingAt: date, matching: DateComponents(second: 0), matchingPolicy: .nextTime)
 
         let result = zip(next3Minutes, dates)
         for i in result {
             XCTAssertEqual(i.0, i.1)
         }
     }
-
+    
     // This test requires 64-bit integers
     #if (arch(x86_64) || arch(arm64)) && FOUNDATION_FRAMEWORK
     func test_multithreadedCalendarAccess() {
@@ -663,6 +664,124 @@ final class CalendarTests : XCTestCase {
         _ = calendar.nextDate(after: date, matching: components, matchingPolicy: .nextTime)
         _ = calendar.nextDate(after: date, matching: components, matchingPolicy: .nextTimePreservingSmallerComponents)
         _ = calendar.nextDate(after: date, matching: components, matchingPolicy: .previousTimePreservingSmallerComponents)
+    }
+    
+    @available(FoundationPreview 0.4, *)
+    func test_dayOfYear() {
+        // An arbitrary date, for which we know the answers
+        let date = Date(timeIntervalSinceReferenceDate: 682898558.712307) // 2022-08-22 22:02:38 UTC, day 234
+        let leapYearDate = Date(timeIntervalSinceReferenceDate: 745891200) // 2024-08-21 00:00:00 UTC, day 234
+        var cal = Calendar(identifier: .gregorian)
+        let tz = TimeZone.gmt
+        cal.timeZone = tz
+        
+        // Ordinality
+        XCTAssertEqual(cal.ordinality(of: .dayOfYear, in: .year, for: date), 234)
+        XCTAssertEqual(cal.ordinality(of: .hour, in: .dayOfYear, for: date), 23)
+        XCTAssertEqual(cal.ordinality(of: .minute, in: .dayOfYear, for: date), 1323)
+        XCTAssertEqual(cal.ordinality(of: .second, in: .dayOfYear, for: date), 79359)
+
+        // Nonsense ordinalities. Since day of year is already relative, we don't count the Nth day of year in an era.
+        XCTAssertEqual(cal.ordinality(of: .dayOfYear, in: .era, for: date), nil)
+        XCTAssertEqual(cal.ordinality(of: .year, in: .dayOfYear, for: date), nil)
+
+        // Interval
+        let interval = cal.dateInterval(of: .dayOfYear, for: date)
+        XCTAssertEqual(interval, DateInterval(start: Date(timeIntervalSinceReferenceDate: 682819200), duration: 86400))
+        
+        // Specific component values
+        XCTAssertEqual(cal.dateComponents(in: .gmt, from: date).dayOfYear, 234)
+        XCTAssertEqual(cal.component(.dayOfYear, from: date), 234)
+        
+        // Enumeration
+        let beforeDate = date - (86400 * 3)
+        let afterDate = date + (86400 * 3)
+        let startOfDate = cal.startOfDay(for: date)
+        
+        var matchingComps = DateComponents(); matchingComps.dayOfYear = 234
+        var foundDate = cal.nextDate(after: beforeDate, matching: matchingComps, matchingPolicy: .nextTime)
+        XCTAssertEqual(foundDate, startOfDate)
+        
+        foundDate = cal.nextDate(after: afterDate, matching: matchingComps, matchingPolicy: .nextTime, direction: .backward)
+        XCTAssertEqual(foundDate, startOfDate)
+        
+        // Go over a leap year
+        let nextFive = Array(cal.dates(startingAt: beforeDate, matching: matchingComps).prefix(5))
+        let expected = [
+            Date(timeIntervalSinceReferenceDate: 682819200), // 2022-08-22 00:00:00 +0000
+            Date(timeIntervalSinceReferenceDate: 714355200), // 2023-08-22 00:00:00 +0000
+            Date(timeIntervalSinceReferenceDate: 745891200), // 2024-08-21 00:00:00 +0000
+            Date(timeIntervalSinceReferenceDate: 777513600), // 2025-08-22 00:00:00 +0000
+            Date(timeIntervalSinceReferenceDate: 809049600), // 2026-08-22 00:00:00 +0000
+        ]
+        XCTAssertEqual(nextFive, expected)
+        
+        // Ranges
+        let min = cal.minimumRange(of: .dayOfYear)
+        let max = cal.maximumRange(of: .dayOfYear)
+        XCTAssertEqual(min, 1..<366) // hard coded for gregorian
+        XCTAssertEqual(max, 1..<367)
+        
+        XCTAssertEqual(cal.range(of: .dayOfYear, in: .year, for: date), 1..<366)
+        XCTAssertEqual(cal.range(of: .dayOfYear, in: .year, for: leapYearDate), 1..<367)
+        
+        // Addition
+        let d1 = cal.date(byAdding: .dayOfYear, value: 1, to: date)
+        XCTAssertEqual(d1, date + 86400)
+        
+        // Using setting to go to Jan 1
+        let jan1 = cal.date(bySetting: .dayOfYear, value: 1, of: date)!
+        let jan1Comps = cal.dateComponents([.year, .month, .day], from: jan1)
+        XCTAssertEqual(jan1Comps.year, 2023)
+        XCTAssertEqual(jan1Comps.day, 1)
+        XCTAssertEqual(jan1Comps.month, 1)
+        
+        // Using setting to go to Jan 1
+        let whatDay = cal.date(bySetting: .dayOfYear, value: 100, of: Date.now)!
+        let _ = cal.component(.weekday, from: whatDay)
+        let _ = Calendar.current.component(.weekday, from: Date.now - (86400 * 5))
+
+        
+        // Comparison
+        XCTAssertEqual(cal.compare(date, to: beforeDate, toGranularity: .dayOfYear), .orderedDescending)
+        XCTAssertEqual(cal.compare(date, to: afterDate, toGranularity: .dayOfYear), .orderedAscending)
+        XCTAssertEqual(cal.compare(date + 10, to: date, toGranularity: .dayOfYear), .orderedSame)
+    }
+    
+    @available(FoundationPreview 0.4, *)
+    func test_dayOfYear_bounds() {
+        let date = Date(timeIntervalSinceReferenceDate: 682898558.712307) // 2022-08-22 22:02:38 UTC, day 234
+        var cal = Calendar(identifier: .gregorian)
+        let tz = TimeZone.gmt
+        cal.timeZone = tz
+        
+        // Test some invalid day of years
+        var dayOfYearComps = DateComponents()
+        dayOfYearComps.dayOfYear = 0
+        let zeroDay = cal.nextDate(after: date, matching: dayOfYearComps, matchingPolicy: .previousTimePreservingSmallerComponents)
+        XCTAssertNil(zeroDay)
+        
+        dayOfYearComps.dayOfYear = 400
+        let futureDay = cal.nextDate(after: date, matching: dayOfYearComps, matchingPolicy: .nextTime)
+        XCTAssertNil(futureDay)
+        
+        // Test subtraction over a year boundary
+        dayOfYearComps.dayOfYear = 1
+        let firstDay = cal.nextDate(after: date, matching: dayOfYearComps, matchingPolicy: .nextTime, direction: .backward)
+        XCTAssertNotNil(firstDay)
+        let firstDayComps = cal.dateComponents([.year], from: firstDay!)
+        let expectationComps = DateComponents(year: 2022)
+        XCTAssertEqual(firstDayComps, expectationComps)
+        
+        var subtractMe = DateComponents()
+        subtractMe.dayOfYear = -1
+        let previousDay = cal.date(byAdding: subtractMe, to: firstDay!)
+        XCTAssertNotNil(previousDay)
+        let previousDayComps = cal.dateComponents([.year, .dayOfYear], from: previousDay!)
+        var previousDayExpectationComps = DateComponents()
+        previousDayExpectationComps.year = 2021
+        previousDayExpectationComps.dayOfYear = 365
+        XCTAssertEqual(previousDayComps, previousDayExpectationComps)
     }
 }
 
