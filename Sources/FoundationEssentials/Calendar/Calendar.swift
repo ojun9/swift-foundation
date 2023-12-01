@@ -554,7 +554,11 @@ public struct Calendar : Hashable, Equatable, Sendable {
                         byAdding component: Calendar.Component,
                         value: Int = 1,
                         wrappingComponents: Bool = false) -> some (Sequence<Date> & Sendable) {
-        DatesByAdding(calendar: self, start: start, range: range, components: DateComponents(component: component, value: value), wrappingComponents: wrappingComponents)
+        guard let components = DateComponents(component: component, value: value) else {
+            preconditionFailure("Attempt to add with an invalid Calendar.Component argument")
+        }
+        
+        return DatesByAdding(calendar: self, start: start, range: range, components: components, wrappingComponents: wrappingComponents)
     }
     
     /// Returns a sequence of `Date`s, calculated by repeatedly adding an amount of `Calendar.Component`s to a starting `Date` and then to each subsequent result.

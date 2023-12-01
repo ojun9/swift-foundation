@@ -393,6 +393,27 @@ public struct DateComponents : Hashable, Equatable, Sendable {
         }
         return true
     }
+    
+    // MARK: -
+    
+    /// Returns a new `DateComponents` where the subset of fields that can be scaled have been mulitplied by `value`.
+    internal func scaled(by value: Int) -> DateComponents {
+        var dc = self
+        if let era = _era { dc.era = era * value }
+        if let year = _year { dc.year = year * value }
+        if let month = _month { dc.month = month * value }
+        if let day = _day { dc.day = day * value }
+        if let hour = _hour { dc.hour = hour * value }
+        if let minute = _minute { dc.minute = minute * value }
+        if let second = _second { dc.second = second * value }
+        if let nanosecond = _nanosecond { dc.nanosecond = nanosecond * value }
+        if let quarter = _quarter { dc.quarter = quarter * value }
+        if let week = _week { dc.week = week * value }
+        if let weekOfMonth = _weekOfMonth { dc.weekOfMonth = weekOfMonth * value }
+        if let weekOfYear = _weekOfYear { dc.weekOfYear = weekOfYear * value }
+        if let yearForWeekOfYear = _yearForWeekOfYear { dc.yearForWeekOfYear = yearForWeekOfYear * value }
+        return dc
+    }
 
     // MARK: -
 

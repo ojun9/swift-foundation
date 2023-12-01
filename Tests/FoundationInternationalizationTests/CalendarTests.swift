@@ -660,6 +660,19 @@ final class CalendarTests : XCTestCase {
     }
     
     @available(FoundationPreview 0.4, *)
+    func test_datesAdding_year() {
+        // Verify that adding 12 months once is the same as adding 1 month 12 times
+        let startDate = Date(timeIntervalSinceReferenceDate: 688946558.712307) // 2022-10-31 22:02:38 UTC
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone.gmt
+        
+        let oneYearOnce = cal.date(byAdding: .month, value: 12, to: startDate)
+        let oneYearTwelve = Array(cal.dates(startingAt: startDate, byAdding: .month, value: 1).prefix(12)).last!
+        
+        XCTAssertEqual(oneYearOnce, oneYearTwelve)
+    }
+    
+    @available(FoundationPreview 0.4, *)
     func test_datesMatching_simpleExample() {
         let cal = Calendar(identifier: .gregorian)
         // August 22, 2022 at 3:02:38 PM PDT

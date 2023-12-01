@@ -284,13 +284,13 @@ extension Calendar {
     struct DatesByMatching : Sendable, Sequence {
         typealias Element = Date
         
-        var calendar: Calendar
-        var start: Date
-        var range: Range<Date>?
-        var matchingComponents: DateComponents
-        var matchingPolicy: Calendar.MatchingPolicy
-        var repeatedTimePolicy: Calendar.RepeatedTimePolicy
-        var direction: Calendar.SearchDirection
+        let calendar: Calendar
+        let start: Date
+        let range: Range<Date>?
+        let matchingComponents: DateComponents
+        let matchingPolicy: Calendar.MatchingPolicy
+        let repeatedTimePolicy: Calendar.RepeatedTimePolicy
+        let direction: Calendar.SearchDirection
         
         init(calendar: Calendar, start: Date, range: Range<Date>?, matchingComponents: DateComponents, matchingPolicy: Calendar.MatchingPolicy = .nextTime, repeatedTimePolicy: Calendar.RepeatedTimePolicy = .first, direction: Calendar.SearchDirection = .forward) {
             self.calendar = calendar
@@ -391,14 +391,14 @@ extension Calendar {
     struct DatesByAdding : Sendable, Sequence {
         typealias Element = Date
         
-        var calendar: Calendar
-        var start: Date
-        var range: Range<Date>?
-        var components: DateComponents?
-        var wrappingComponents: Bool
+        let calendar: Calendar
+        let start: Date
+        let range: Range<Date>?
+        let components: DateComponents
+        let wrappingComponents: Bool
         
         /// If `components` is `nil`, the result is an empty `Sequence`.
-        internal init(calendar: Calendar, start: Date, range: Range<Date>?, components: DateComponents?, wrappingComponents: Bool) {
+        internal init(calendar: Calendar, start: Date, range: Range<Date>?, components: DateComponents, wrappingComponents: Bool) {
             self.calendar = calendar
             self.start = start
             self.range = range
@@ -407,47 +407,43 @@ extension Calendar {
         }
         
         struct Iterator: Sendable, IteratorProtocol {
-            var calendar: Calendar
-            var previousResult: Date?
+            let calendar: Calendar
+            let start: Date
             let range: Range<Date>?
-            var components: DateComponents?
-            var wrappingComponents: Bool
+            let components: DateComponents
+            let wrappingComponents: Bool
+            var finished = false
+            var iteration = 1
             
             /// If `components` is `nil`, the result is an empty `Sequence`.
-            init(calendar: Calendar, start: Date, range: Range<Date>?, components: DateComponents?, wrappingComponents: Bool) {
+            init(calendar: Calendar, start: Date, range: Range<Date>?, components: DateComponents, wrappingComponents: Bool) {
+                self.start = start
                 self.calendar = calendar
-                previousResult = start
                 self.components = components
                 self.range = range
                 self.wrappingComponents = wrappingComponents
             }
             
             mutating func next() -> Element? {
-                guard let components else {
-                    // We have nothing to add
+                guard !finished else {
                     return nil
                 }
                 
-                guard let startAt = previousResult else {
-                    // We have finished
-                    return nil
-                }
-                                
-                let next = calendar.date(byAdding: components, to: startAt, wrappingComponents: wrappingComponents)
+                let scaled = components.scaled(by: iteration)
+                let next = calendar.date(byAdding: scaled, to: start, wrappingComponents: wrappingComponents)
                 guard let next else {
                     // We have finished
-                    previousResult = nil
+                    finished = false
                     return nil
                 }
                 
                 if let range, !range.contains(next) {
                     // We are out of the range
-                    previousResult = nil
+                    finished = true
                     return nil
                 }
                 
-                // Next addition is based on this new result
-                previousResult = next
+                iteration += 1
                 return next
             }
         }
