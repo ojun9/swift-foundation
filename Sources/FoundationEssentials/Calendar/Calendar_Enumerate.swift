@@ -433,7 +433,7 @@ extension Calendar {
                 let next = calendar.date(byAdding: scaled, to: start, wrappingComponents: wrappingComponents)
                 guard let next else {
                     // We have finished
-                    finished = false
+                    finished = true
                     return nil
                 }
                 
