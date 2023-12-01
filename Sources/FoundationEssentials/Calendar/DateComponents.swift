@@ -79,6 +79,14 @@ public struct DateComponents : Hashable, Equatable, Sendable {
         }
     }
 
+    package init?(component: Calendar.Component, value: Int) {
+        switch component {
+        case .calendar, .timeZone, .isLeapMonth:
+            return nil
+        default:
+            setValue(value, for: component)
+        }
+    }
 
     // MARK: - Properties
 
@@ -215,7 +223,7 @@ public struct DateComponents : Hashable, Equatable, Sendable {
     /// For example, in the Gregorian calendar, can go from 1 to 365 or 1 to 366 in leap years.
     /// - note: This value is interpreted in the context of the calendar in which it is used.
     @available(FoundationPreview 0.4, *)
-    package/*SF-NNNN public*/ var dayOfYear: Int? {
+    public var dayOfYear: Int? {
         get { _dayOfYear }
         set { _dayOfYear = converted(newValue) }
     }

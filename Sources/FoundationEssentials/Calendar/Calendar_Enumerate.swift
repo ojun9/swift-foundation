@@ -281,32 +281,33 @@ private func _handleCalendarResultNotFound(date: Date, calendar: Calendar, comps
 
 extension Calendar {
     /// A `Sequence` of `Date`s which match the specified search criteria.
-    /// - note: This sequence will terminate after a built-in search limit to prevent infinite loops.
-    @available(FoundationPreview 0.4, *)
-    package/*SF-NNNN public*/ struct DateSequence : Sendable, Sequence {
-        public typealias Element = Date
+    struct DatesByMatching : Sendable, Sequence {
+        typealias Element = Date
         
-        public var calendar: Calendar
-        public var start: Date
-        public var matchingComponents: DateComponents
-        public var matchingPolicy: Calendar.MatchingPolicy
-        public var repeatedTimePolicy: Calendar.RepeatedTimePolicy
-        public var direction: Calendar.SearchDirection
+        var calendar: Calendar
+        var start: Date
+        var range: Range<Date>?
+        var matchingComponents: DateComponents
+        var matchingPolicy: Calendar.MatchingPolicy
+        var repeatedTimePolicy: Calendar.RepeatedTimePolicy
+        var direction: Calendar.SearchDirection
         
-        public init(calendar: Calendar, start: Date, matchingComponents: DateComponents, matchingPolicy: Calendar.MatchingPolicy = .nextTime, repeatedTimePolicy: Calendar.RepeatedTimePolicy = .first, direction: Calendar.SearchDirection = .forward) {
+        init(calendar: Calendar, start: Date, range: Range<Date>?, matchingComponents: DateComponents, matchingPolicy: Calendar.MatchingPolicy = .nextTime, repeatedTimePolicy: Calendar.RepeatedTimePolicy = .first, direction: Calendar.SearchDirection = .forward) {
             self.calendar = calendar
-            self.start = start
             self.matchingComponents = matchingComponents
             self.matchingPolicy = matchingPolicy
             self.repeatedTimePolicy = repeatedTimePolicy
             self.direction = direction
+            self.start = start
+            self.range = range
         }
-        
-        public struct Iterator: Sendable, IteratorProtocol {
+
+        struct Iterator: Sendable, IteratorProtocol {
             var iterations: Int
             var previouslyReturnedMatchDate: Date?
             var searchingDate: Date
             
+            let range: Range<Date>?
             let start: Date
             let calendar: Calendar
             let matchingComponents: DateComponents
@@ -316,25 +317,28 @@ extension Calendar {
             let searchLimit: Int = 100
             
             // Calculated at init, checked on `next`
-            let validated: Bool
+            var finished: Bool
             
-            internal init(_ calendar: Calendar, start: Date, matching matchingComponents: DateComponents, matchingPolicy: Calendar.MatchingPolicy, repeatedTimePolicy: Calendar.RepeatedTimePolicy, direction: Calendar.SearchDirection) {
+            internal init(_ calendar: Calendar, start: Date, range: Range<Date>?, matching matchingComponents: DateComponents, matchingPolicy: Calendar.MatchingPolicy, repeatedTimePolicy: Calendar.RepeatedTimePolicy, direction: Calendar.SearchDirection) {
                 self.calendar = calendar
-                self.start = start
+                
+                self.range = range
                 self.matchingComponents = matchingComponents
                 self.matchingPolicy = matchingPolicy
                 self.repeatedTimePolicy = repeatedTimePolicy
                 self.direction = direction
-                
-                self.searchingDate = start
+                self.start = start
                 iterations = -1
                 
+                // Start searching here
+                searchingDate = start
+                
                 // If this fails we'll short circuit the next `next`
-                validated = matchingComponents._validate(for: calendar)
+                finished = !matchingComponents._validate(for: calendar)
             }
             
-            public mutating func next() -> Element? {
-                guard validated else { return nil }
+            mutating func next() -> Element? {
+                guard !finished else { return nil }
                 
                 repeat {
                     iterations += 1
@@ -346,6 +350,13 @@ extension Calendar {
                         // Return a value if we have a result. Else, continue on searching unless we've hit our search limit.
                         // This version of the implementation ignores the 'exactMatch' result. Nobody cares unless they specify `strict`, and if they do that all results are exact anyway.
                         if let (matchDate, _) = result.result {
+                            
+                            if let range, !range.contains(matchDate) {
+                                // We are outside the scope of our search
+                                finished = true
+                                return nil
+                            }
+                            
                             previouslyReturnedMatchDate = matchDate
                             return matchDate
                         }
@@ -357,10 +368,12 @@ extension Calendar {
                         } else {
                             // Give up
                             _handleCalendarResultNotFound(date: start, calendar: calendar, comps: matchingComponents, direction: direction, matchingPolicy: matchingPolicy, repeatedTimePolicy: repeatedTimePolicy)
+                            finished = true
                             return nil
                         }
                     } catch (let e as CalendarEnumerationError) {
                         _handleCalendarError(e, date: start, calendar: calendar, comps: matchingComponents, direction: direction, matchingPolicy: matchingPolicy, repeatedTimePolicy: repeatedTimePolicy)
+                        finished = true
                         return nil
                     } catch {
                         fatalError("Unexpected Calendar enumeration error type")
@@ -370,7 +383,77 @@ extension Calendar {
         }
         
         public func makeIterator() -> Iterator {
-            return Iterator(calendar, start: start, matching: matchingComponents, matchingPolicy: matchingPolicy, repeatedTimePolicy: repeatedTimePolicy, direction: direction)
+            return Iterator(calendar, start: start, range: range, matching: matchingComponents, matchingPolicy: matchingPolicy, repeatedTimePolicy: repeatedTimePolicy, direction: direction)
+        }
+    }
+    
+    /// A `Sequence` of `Date`s, calculated by iterative addition of `DateComponents`.
+    struct DatesByAdding : Sendable, Sequence {
+        typealias Element = Date
+        
+        var calendar: Calendar
+        var start: Date
+        var range: Range<Date>?
+        var components: DateComponents?
+        var wrappingComponents: Bool
+        
+        /// If `components` is `nil`, the result is an empty `Sequence`.
+        internal init(calendar: Calendar, start: Date, range: Range<Date>?, components: DateComponents?, wrappingComponents: Bool) {
+            self.calendar = calendar
+            self.start = start
+            self.range = range
+            self.components = components
+            self.wrappingComponents = wrappingComponents
+        }
+        
+        struct Iterator: Sendable, IteratorProtocol {
+            var calendar: Calendar
+            var previousResult: Date?
+            let range: Range<Date>?
+            var components: DateComponents?
+            var wrappingComponents: Bool
+            
+            /// If `components` is `nil`, the result is an empty `Sequence`.
+            init(calendar: Calendar, start: Date, range: Range<Date>?, components: DateComponents?, wrappingComponents: Bool) {
+                self.calendar = calendar
+                previousResult = start
+                self.components = components
+                self.range = range
+                self.wrappingComponents = wrappingComponents
+            }
+            
+            mutating func next() -> Element? {
+                guard let components else {
+                    // We have nothing to add
+                    return nil
+                }
+                
+                guard let startAt = previousResult else {
+                    // We have finished
+                    return nil
+                }
+                                
+                let next = calendar.date(byAdding: components, to: startAt, wrappingComponents: wrappingComponents)
+                guard let next else {
+                    // We have finished
+                    previousResult = nil
+                    return nil
+                }
+                
+                if let range, !range.contains(next) {
+                    // We are out of the range
+                    previousResult = nil
+                    return nil
+                }
+                
+                // Next addition is based on this new result
+                previousResult = next
+                return next
+            }
+        }
+        
+        func makeIterator() -> Iterator {
+            return Iterator(calendar: calendar, start: start, range: range, components: components, wrappingComponents: wrappingComponents)
         }
     }
 }
