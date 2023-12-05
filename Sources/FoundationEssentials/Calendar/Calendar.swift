@@ -539,7 +539,7 @@ public struct Calendar : Hashable, Equatable, Sendable {
         return self.date(byAdding: dc, to: date, wrappingComponents: wrappingComponents)
     }
 
-    /// Returns a sequence of `Date`s, calculated by repeatedly adding an amount of `Calendar.Component`s to a starting `Date` and then to each subsequent result.
+    /// Returns a sequence of `Date`s, calculated by adding a scaled amount of `Calendar.Component`s to a starting `Date`.
     /// If a range is supplied, the sequence terminates if the next result is not contained in the range. The starting point does not need to be contained in the range, but if the first result is outside of the range then the result will be an empty sequence.
     ///
     /// - parameter start: The starting point of the search.
@@ -549,11 +549,11 @@ public struct Calendar : Hashable, Equatable, Sendable {
     /// - parameter wrappingComponents: If `true`, the component should be incremented and wrap around to zero/one on overflow, and should not cause higher components to be incremented. The default value is `false`.
     /// - returns: A `Sequence` of `Date` values, or an empty sequence if no addition could be performed.
     @available(FoundationPreview 0.4, *)
-    internal func dates(startingAt start: Date,
-                        in range: Range<Date>? = nil,
-                        byAdding component: Calendar.Component,
-                        value: Int = 1,
-                        wrappingComponents: Bool = false) -> some (Sequence<Date> & Sendable) {
+    public func dates(byAdding component: Calendar.Component,
+                      value: Int = 1,
+                      startingAt start: Date,
+                      in range: Range<Date>? = nil,
+                      wrappingComponents: Bool = false) -> some (Sequence<Date> & Sendable) {
         guard let components = DateComponents(component: component, value: value) else {
             preconditionFailure("Attempt to add with an invalid Calendar.Component argument")
         }
@@ -561,7 +561,7 @@ public struct Calendar : Hashable, Equatable, Sendable {
         return DatesByAdding(calendar: self, start: start, range: range, components: components, wrappingComponents: wrappingComponents)
     }
     
-    /// Returns a sequence of `Date`s, calculated by repeatedly adding an amount of `Calendar.Component`s to a starting `Date` and then to each subsequent result.
+    /// Returns a sequence of `Date`s, calculated by repeatedly adding an amount of `DateComponents` to a starting `Date` and then to each subsequent result.
     /// If a range is supplied, the sequence terminates if the next result is not contained in the range. The starting point does not need to be contained in the range, but if the first result is outside of the range then the result will be an empty sequence.
     ///
     /// - parameter start: The starting point of the search.
@@ -570,10 +570,10 @@ public struct Calendar : Hashable, Equatable, Sendable {
     /// - parameter wrappingComponents: If `true`, the component should be incremented and wrap around to zero/one on overflow, and should not cause higher components to be incremented. The default value is `false`.
     /// - returns: A `Sequence` of `Date` values, or an empty sequence if no addition could be performed.
     @available(FoundationPreview 0.4, *)
-    internal func dates(startingAt start: Date,
-                        in range: Range<Date>? = nil,
-                        byAdding components: DateComponents,
-                        wrappingComponents: Bool = false) -> some (Sequence<Date> & Sendable) {
+    public func dates(byAdding components: DateComponents,
+                      startingAt start: Date,
+                      in range: Range<Date>? = nil,
+                      wrappingComponents: Bool = false) -> some (Sequence<Date> & Sendable) {
         DatesByAdding(calendar: self, start: start, range: range, components: components, wrappingComponents: wrappingComponents)
     }
     
@@ -1130,9 +1130,9 @@ public struct Calendar : Hashable, Equatable, Sendable {
     /// - parameter repeatedTimePolicy: Determines the behavior of the search algorithm when the input produces a time that occurs twice on a particular day.
     /// - parameter direction: Which direction in time to search. The default value is `.forward`, which means later in time.
     @available(FoundationPreview 0.4, *)
-    public func dates(startingAt start: Date,
+    public func dates(byMatching components: DateComponents,
+                      startingAt start: Date,
                       in range: Range<Date>? = nil,
-                      matching components: DateComponents,
                       matchingPolicy: MatchingPolicy = .nextTime,
                       repeatedTimePolicy: RepeatedTimePolicy = .first,
                       direction: SearchDirection = .forward) -> some (Sequence<Date> & Sendable) {

@@ -655,7 +655,7 @@ final class CalendarTests : XCTestCase {
         cal.timeZone = tz
         
         // Purpose of this test is not to test the addition itself (we have others for that), but to smoke test the wrapping API
-        let numberOfDays = Array(cal.dates(startingAt: startDate, in: startDate..<endDate, byAdding: .day)).count
+        let numberOfDays = Array(cal.dates(byAdding: .day, startingAt: startDate, in: startDate..<endDate)).count
         XCTAssertEqual(numberOfDays, 3)
     }
     
@@ -667,7 +667,7 @@ final class CalendarTests : XCTestCase {
         cal.timeZone = TimeZone.gmt
         
         let oneYearOnce = cal.date(byAdding: .month, value: 12, to: startDate)
-        let oneYearTwelve = Array(cal.dates(startingAt: startDate, byAdding: .month, value: 1).prefix(12)).last!
+        let oneYearTwelve = Array(cal.dates(byAdding: .month, value: 1, startingAt: startDate).prefix(12)).last!
         
         XCTAssertEqual(oneYearOnce, oneYearTwelve)
     }
@@ -683,7 +683,7 @@ final class CalendarTests : XCTestCase {
             Date(timeIntervalSinceReferenceDate: 682898700.0),
         ]
 
-        let dates = cal.dates(startingAt: date, matching: DateComponents(second: 0), matchingPolicy: .nextTime)
+        let dates = cal.dates(byMatching: DateComponents(second: 0), startingAt: date, matchingPolicy: .nextTime)
 
         let result = zip(next3Minutes, dates)
         for i in result {
@@ -703,19 +703,19 @@ final class CalendarTests : XCTestCase {
         dc.hour = 22
 
         // There should be 3 "hour 23"s in this range.
-        let numberOfMatchesForward = Array(cal.dates(startingAt: startDate, in: startDate..<endDate, matching: dc)).count
+        let numberOfMatchesForward = Array(cal.dates(byMatching: dc, startingAt: startDate, in: startDate..<endDate)).count
         XCTAssertEqual(numberOfMatchesForward, 3)
         
-        let numberOfMatchesBackward = Array(cal.dates(startingAt: endDate, in: startDate..<endDate, matching: dc, direction: .backward)).count
+        let numberOfMatchesBackward = Array(cal.dates(byMatching: dc, startingAt: endDate, in: startDate..<endDate, direction: .backward)).count
         XCTAssertEqual(numberOfMatchesBackward, 3)
         
-        let unboundedForward = Array(cal.dates(startingAt: startDate, matching: dc).prefix(10))
+        let unboundedForward = Array(cal.dates(byMatching: dc, startingAt: startDate).prefix(10))
         XCTAssertEqual(unboundedForward.count, 10)
         
         // sanity check of results
         XCTAssertTrue(unboundedForward.first! < unboundedForward.last!)
         
-        let unboundedBackward = Array(cal.dates(startingAt: startDate, matching: dc, direction: .backward).prefix(10))
+        let unboundedBackward = Array(cal.dates(byMatching: dc, startingAt: startDate, direction: .backward).prefix(10))
         XCTAssertEqual(unboundedForward.count, 10)
         
         // sanity check of results
@@ -798,7 +798,7 @@ final class CalendarTests : XCTestCase {
         XCTAssertEqual(foundDate, startOfDate)
         
         // Go over a leap year
-        let nextFive = Array(cal.dates(startingAt: beforeDate, matching: matchingComps).prefix(5))
+        let nextFive = Array(cal.dates(byMatching: matchingComps, startingAt: beforeDate).prefix(5))
         let expected = [
             Date(timeIntervalSinceReferenceDate: 682819200), // 2022-08-22 00:00:00 +0000
             Date(timeIntervalSinceReferenceDate: 714355200), // 2023-08-22 00:00:00 +0000
@@ -842,7 +842,7 @@ final class CalendarTests : XCTestCase {
         // Nonsense day-of-year
         var nonsenseDayOfYear = DateComponents()
         nonsenseDayOfYear.dayOfYear = 500
-        let shouldBeEmpty = Array(cal.dates(startingAt: beforeDate, matching: nonsenseDayOfYear))
+        let shouldBeEmpty = Array(cal.dates(byMatching: nonsenseDayOfYear, startingAt: beforeDate))
         XCTAssertTrue(shouldBeEmpty.isEmpty)
     }
 
